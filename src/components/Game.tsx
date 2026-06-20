@@ -479,18 +479,18 @@ export function Game({
         <div className="game-main">
           <div className="play-area">
             <div className="play-clock">
+              {streakFlames ? <div className="streak-flames">{streakFlames}</div> : null}
+              <div
+                className={
+                  "round-timer" +
+                  (elapsedMs > 0 && elapsedMs <= fastMs ? " round-timer--fast" : "")
+                }
+                aria-live="polite"
+                aria-label={`Elapsed time ${(elapsedMs / 1000).toFixed(1)} seconds`}
+              >
+                ⏱ {(elapsedMs / 1000).toFixed(1)}s
+              </div>
               <div className="clock-stage">
-                {streakFlames ? <div className="streak-flames">{streakFlames}</div> : null}
-                <div
-                  className={
-                    "round-timer" +
-                    (elapsedMs > 0 && elapsedMs <= fastMs ? " round-timer--fast" : "")
-                  }
-                  aria-live="polite"
-                  aria-label={`Elapsed time ${(elapsedMs / 1000).toFixed(1)} seconds`}
-                >
-                  ⏱ {(elapsedMs / 1000).toFixed(1)}s
-                </div>
                 <Clock h={current.h} m={current.m} face={watchFace} />
               </div>
             </div>

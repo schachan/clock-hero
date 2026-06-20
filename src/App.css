@@ -161,28 +161,30 @@ body {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 40px;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
-  padding: 0 4px;
+  padding: 0 8px;
 }
 
 .play-clock {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 0 1 auto;
+  justify-content: center;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
-  align-self: center;
   position: relative;
+  gap: 8px;
 }
 
 .play-input {
   flex: 0 0 280px;
   width: 280px;
-  max-width: 42%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -213,9 +215,10 @@ body {
   }
 
   .col-history {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     width: 100%;
-    min-height: 100px;
+    min-height: 72px;
+    max-height: 32vh;
   }
 
   .game-main {
@@ -226,24 +229,18 @@ body {
 @media (max-width: 720px) {
   .play-area {
     flex-direction: column;
-    gap: 4px;
-    padding: 0 4px;
+    gap: 12px;
+    padding: 0 8px;
   }
 
   .play-clock {
-    flex: 0 1 auto;
-    width: auto;
+    flex: 0 0 auto;
+    width: 100%;
   }
 
   .play-input {
     flex: 0 0 auto;
     width: min(100%, 340px);
-    max-width: 100%;
-  }
-
-  .app--game .clock {
-    width: min(52cqw, 52cqh, 300px);
-    height: min(52cqw, 52cqh, 300px);
   }
 }
 
@@ -801,19 +798,19 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 8px;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-height: 0;
-  width: 100%;
   position: relative;
-  container-type: size;
 }
 
 .clock-stage::before {
   content: "";
   position: absolute;
-  width: min(62cqw, 62cqh, 480px);
-  height: min(62cqw, 62cqh, 480px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 107%;
+  height: 107%;
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 251, 235, 0.6) 42%, rgba(254, 243, 199, 0.22) 100%);
@@ -838,8 +835,7 @@ body {
   height: auto;
   aspect-ratio: 1;
   max-width: 100%;
-  max-height: 100%;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   filter:
     drop-shadow(0 3px 8px rgba(68, 64, 60, 0.12))
     drop-shadow(0 14px 28px rgba(41, 37, 36, 0.1))
@@ -847,16 +843,15 @@ body {
 }
 
 .app--game .clock {
-  width: min(54cqw, 54cqh, 440px);
-  height: min(54cqw, 54cqh, 440px);
+  width: clamp(150px, min(42vw, 60vh), 380px);
+  height: clamp(150px, min(42vw, 60vh), 380px);
+  flex: 0 0 auto;
 }
 
-@supports not (width: 1cqw) {
+@media (max-width: 720px) {
   .app--game .clock {
-    width: auto;
-    height: 54%;
-    max-width: min(100%, 44vmin, 440px);
-    aspect-ratio: 1;
+    width: clamp(150px, min(70vw, 42vh), 320px);
+    height: clamp(150px, min(70vw, 42vh), 320px);
   }
 }
 
@@ -1878,7 +1873,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-bottom: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--soft-border);
+  box-shadow: var(--shadow-sm);
   pointer-events: none;
   transition: color 0.2s ease;
 }
@@ -2486,8 +2485,8 @@ body {
   }
 
   .app--game .clock {
-    width: min(52cqw, 52cqh, 260px);
-    height: min(52cqw, 52cqh, 260px);
+    width: clamp(140px, min(72vw, 38vh), 280px);
+    height: clamp(140px, min(72vw, 38vh), 280px);
   }
 
   .labels-row {
