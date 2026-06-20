@@ -61,6 +61,14 @@ npm run preview
 
 `npm run build` outputs static files to `dist/`. `npm run preview` serves that build locally so you can verify production behavior.
 
+## Live demo
+
+The app is hosted on GitHub Pages:
+
+**https://schachan.github.io/clock-hero/**
+
+Pushes to `main` deploy automatically via GitHub Actions (`.github/workflows/deploy-pages.yml`).
+
 ## Available scripts
 
 | Command | Description |
