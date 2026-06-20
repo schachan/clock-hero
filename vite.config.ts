@@ -2,10 +2,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const repoBase = "/clock-hero/";
-
-export default defineConfig({
-  base: repoBase,
+export default defineConfig(({ mode }) => ({
+  base: mode === "gh-pages" ? "/clock-hero/" : "/",
   plugins: [react()],
   test: {
     globals: true,
@@ -27,4 +25,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
