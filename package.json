@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm test && npm run build",
+    "prepare:hooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "react": "^19.1.0",
