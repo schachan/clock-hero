@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  matchPath,
   Navigate,
   Route,
   Routes,
   useLocation,
   useNavigate,
-  useParams,
 } from "react-router-dom";
 import { DEFAULT_AGE, MAX_AGE } from "./constants/scoring";
 import { LEVELS } from "./constants/levels";
@@ -45,10 +45,16 @@ function parseLevelIndex(raw: string | undefined): number | null {
   return levelIndex;
 }
 
+function isLevelUnlocked(levelIndex: number, levelProgress: LevelProgressMap): boolean {
+  if (levelIndex === 0) return true;
+  return levelProgress[levelIndex]?.unlocked === true;
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { levelIndex: levelIndexParam } = useParams<{ levelIndex: string }>();
+  const gameMatch = matchPath({ path: paths.gamePattern, end: true }, location.pathname);
+  const selectedLevel = parseLevelIndex(gameMatch?.params.levelIndex);
 
   const [playerName, setPlayerName] = useState(loadPlayerName);
   const [playerAge, setPlayerAge] = useState(loadPlayerAge);
@@ -64,7 +70,6 @@ export default function App() {
 
   const trimmedName = playerName.trim().slice(0, 14);
   const challengeAge = playerProgress.activeChallengeAge;
-  const selectedLevel = parseLevelIndex(levelIndexParam);
 
   const activeLevelProgress = useMemo(
     () => playerProgress.byAge[challengeAge] ?? defaultLevelProgress(),
@@ -125,23 +130,10 @@ export default function App() {
 
   const selectLevel = useCallback(
     (levelIndex: number) => {
-      const current = playerProgressRef.current;
-      const age = current.activeChallengeAge;
-      const tier = { ...(current.byAge[age] ?? ensureAgeTier(current, age)) };
-      tier[levelIndex] = {
-        ...tier[levelIndex],
-        correct: 0,
-        wrong: 0,
-        score: 0,
-      };
-      persistPlayerProgress({
-        ...current,
-        byAge: { ...current.byAge, [age]: tier },
-      });
       setGameKey((k) => k + 1);
       navigate(paths.game(levelIndex));
     },
-    [navigate, persistPlayerProgress],
+    [navigate],
   );
 
   const handleProgressChange = useCallback(
@@ -262,9 +254,8 @@ export default function App() {
     navigate(paths.start);
   }, [navigate]);
 
-  const isLevelUnlocked =
-    selectedLevel !== null &&
-    (activeLevelProgress[selectedLevel]?.unlocked ?? selectedLevel === 0);
+  const levelUnlocked =
+    selectedLevel !== null && isLevelUnlocked(selectedLevel, activeLevelProgress);
 
   return (
     <div
@@ -305,7 +296,7 @@ export default function App() {
         <Route
           path={paths.gamePattern}
           element={
-            selectedLevel === null || !isLevelUnlocked ? (
+            selectedLevel === null || !levelUnlocked ? (
               <Navigate to={paths.levels} replace />
             ) : (
               <Game

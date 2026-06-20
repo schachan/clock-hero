@@ -134,7 +134,8 @@ describe("App", () => {
 
     const playButtons = screen.getAllByRole("button", { name: /Play/i });
     await user.click(playButtons[0]!);
-    expect(screen.getByText("O'clock · Dotty")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Go/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Pick a Level/)).not.toBeInTheDocument();
   });
 
   it("resets progress from start screen", async () => {
