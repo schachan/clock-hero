@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Clock Hero — Tell the Time!</title>
+<style>
+  :root{
+    --bg1:#7c4dff; --bg2:#18b6e8; --card:#ffffff; --ink:#2b2d42;
+    --accent:#ff6f91; --good:#1fc16b; --bad:#ff5d5d; --warn:#ffb020;
+    --soft:#f1f3ff; --hour:#5b4bff; --minute:#ff6f91;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+    background:linear-gradient(135deg,var(--bg1),var(--bg2));
+    color:var(--ink);
+    min-height:100%;
+    display:flex; align-items:center; justify-content:center;
+    padding:14px;
+    overflow-x:hidden;
+  }
+  .app{
+    width:100%; max-width:940px;
+    background:var(--card);
+    border-radius:28px;
+    box-shadow:0 18px 50px rgba(0,0,0,.28);
+    padding:20px 22px 24px;
+    position:relative;
+    overflow:hidden;
+  }
+  /* two-column play area on wide screens */
+  .game-grid{ display:flex; gap:22px; align-items:flex-start; }
+  .col-clock{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; }
+  .col-input{ flex:0 0 300px; display:flex; flex-direction:column; }
+  @media (max-width:720px){
+    .game-grid{ flex-direction:column; gap:6px; }
+    .col-input{ flex:1 1 auto; width:100%; }
+  }
+  /* ---------- top bar ---------- */
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;}
+  .level-chip{
+    background:var(--soft); border-radius:999px; padding:6px 14px;
+    font-weight:bold; font-size:15px; color:var(--hour);
+    display:flex; align-items:center; gap:6px;
+  }
+  .level-name{font-size:12px; color:#8a8fb5; font-weight:bold;}
+  .stat-mini{display:flex; gap:8px;}
+  .pill{
+    background:var(--soft); border-radius:999px; padding:6px 10px;
+    font-size:13px; font-weight:bold; min-width:58px; text-align:center;
+  }
+  .pill small{display:block; font-size:9px; color:#8a8fb5; font-weight:bold;}
+  .reset-btn{
+    border:none; background:var(--soft); color:var(--hour); cursor:pointer;
+    width:40px; height:40px; border-radius:12px; font-size:20px; font-weight:bold;
+    align-self:center; transition:transform .08s, background .15s; font-family:inherit;
+  }
+  .reset-btn:active{transform:scale(.9); background:#ffe7e7; color:var(--bad);}
+  /* ---------- progress ---------- */
+  .progress-wrap{height:12px; background:var(--soft); border-radius:999px; margin:6px 0 12px; overflow:hidden;}
+  .progress-bar{height:100%; width:0%; background:linear-gradient(90deg,#ffd166,#06d6a0); border-radius:999px; transition:width .35s ease;}
+  /* ---------- clock ---------- */
+  .clock-stage{display:flex; justify-content:center; align-items:center; flex:1 1 auto; margin:6px 0 4px; position:relative;}
+  .clock{ width:min(360px,80vw); height:min(360px,80vw); filter:drop-shadow(0 8px 14px rgba(0,0,0,.18)); }
+  /* ---------- input ---------- */
+  .answer-row{display:flex; align-items:center; justify-content:center; gap:6px; margin:4px 0 8px;}
+  .timebox{
+    width:84px; height:74px; border-radius:18px; background:var(--soft);
+    display:flex; align-items:center; justify-content:center;
+    font-size:42px; font-weight:bold; color:var(--ink);
+    border:4px solid transparent; cursor:pointer; user-select:none;
+    transition:border-color .15s, transform .1s;
+  }
+  .timebox.active{ border-color:var(--accent); transform:scale(1.04); }
+  .timebox .ph{color:#c4c8e6;}
+  .colon{font-size:42px; font-weight:bold; color:var(--ink);}
+  .box-label{font-size:11px; color:#8a8fb5; font-weight:bold; text-align:center; margin-top:2px;}
+  .labels-row{display:flex; justify-content:center; gap:96px; margin-bottom:6px;}
+  /* ---------- keypad ---------- */
+  .keypad{display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-top:6px;}
+  .key{
+    height:56px; border:none; border-radius:16px; background:var(--soft);
+    font-size:26px; font-weight:bold; color:var(--hour); cursor:pointer;
+    transition:transform .08s, background .15s;
+  }
+  .key:active{transform:scale(.92); background:#e3e7ff;}
+  .key.wide{grid-column:span 1;}
+  .key.del{background:#ffe7e7; color:var(--bad); font-size:20px;}
+  .key.check{background:linear-gradient(135deg,#1fc16b,#06d6a0); color:#fff; font-size:20px;}
+  .key.check:disabled{opacity:.45; filter:grayscale(.4);}
+  /* ---------- feedback ---------- */
+  .feedback{
+    position:absolute; inset:0; background:rgba(255,255,255,.97);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; text-align:center; padding:24px; opacity:0; pointer-events:none;
+    transition:opacity .2s; z-index:5;
+  }
+  .feedback.show{opacity:1; pointer-events:auto;}
+  .fb-emoji{font-size:88px; line-height:1; animation:pop .4s ease;}
+  .fb-title{font-size:34px; font-weight:bold;}
+  .fb-sub{font-size:20px; color:#6b6f99; line-height:1.4;}
+  .fb-words{font-size:26px; font-weight:bold; color:var(--hour); background:var(--soft); padding:8px 18px; border-radius:16px;}
+  .fb-time-fast{color:var(--good); font-weight:bold;}
+  @keyframes pop{0%{transform:scale(.3);}60%{transform:scale(1.2);}100%{transform:scale(1);}}
+  /* ---------- start / win screens ---------- */
+  .overlay{
+    position:absolute; inset:0; background:linear-gradient(135deg,var(--bg1),var(--bg2));
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; text-align:center; padding:30px; color:#fff; z-index:10;
+  }
+  .overlay h1{font-size:38px; margin:0;}
+  .overlay p{font-size:18px; margin:0; line-height:1.5; opacity:.95;}
+  .big-btn{
+    border:none; border-radius:20px; padding:16px 36px; font-size:24px; font-weight:bold;
+    background:#fff; color:var(--hour); cursor:pointer; box-shadow:0 8px 0 rgba(0,0,0,.18);
+    transition:transform .1s; font-family:inherit;
+  }
+  .big-btn:active{transform:translateY(4px); box-shadow:0 4px 0 rgba(0,0,0,.18);}
+  .win-stats{display:flex; gap:14px; margin-top:6px;}
+  .win-stat{background:rgba(255,255,255,.18); border-radius:16px; padding:10px 16px;}
+  .win-stat b{display:block; font-size:26px;}
+  .win-stat span{font-size:12px; opacity:.9;}
+  .name-input{
+    border:none; border-radius:16px; padding:14px 18px; font-size:20px; font-weight:bold;
+    text-align:center; width:240px; max-width:80%; color:var(--hour); font-family:inherit;
+    box-shadow:0 6px 0 rgba(0,0,0,.15); outline:none;
+  }
+  .name-input::placeholder{color:#b9bce0; font-weight:bold;}
+  .player-tag{
+    position:absolute; top:14px; left:18px; font-size:13px; font-weight:bold;
+    color:var(--hour); background:var(--soft); padding:5px 12px; border-radius:999px; z-index:1;
+  }
+  .hidden{display:none !important;}
+  .streak-flames{font-size:14px; color:var(--warn); font-weight:bold; text-align:center; height:18px; margin-top:2px;}
+  /* feedback action buttons (wrong answer) */
+  .fb-actions{ display:flex; gap:12px; margin-top:14px; }
+  .fb-btn{ border:none; border-radius:16px; padding:13px 24px; font-size:19px; font-weight:bold;
+    cursor:pointer; font-family:inherit; box-shadow:0 5px 0 rgba(0,0,0,.14); transition:transform .1s; }
+  .fb-btn:active{ transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.14); }
+  .fb-btn.show{ background:#fff3d6; color:#b8860b; }
+  .fb-btn.next{ background:linear-gradient(135deg,#5b4bff,#18b6e8); color:#fff; }
+  /* review / explanation overlay */
+  .review{ position:absolute; inset:0; background:rgba(20,15,45,.55); z-index:30;
+    display:flex; align-items:center; justify-content:center; padding:14px; overflow-y:auto; }
+  .review-card{ background:#fff; border-radius:24px; padding:20px 20px 22px; width:100%; max-width:420px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; max-height:94%; overflow-y:auto; }
+  .review-card h2{ margin:0 0 8px; font-size:24px; color:var(--hour); }
+  .review-clock{ width:min(220px,62vw); height:min(220px,62vw); }
+  .review-legend{ display:flex; justify-content:center; gap:16px; margin:4px 0 12px; font-size:13px; font-weight:bold; color:#6b6f99; flex-wrap:wrap; }
+  .review-legend .dot{ display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; margin-right:4px; }
+  .review-legend .dot.hour{ background:var(--hour); }
+  .review-legend .dot.minute{ background:var(--minute); }
+  .review-steps{ text-align:left; margin:0 0 12px; padding-left:22px; }
+  .review-steps li{ font-size:16px; line-height:1.5; margin-bottom:8px; color:var(--ink); }
+  .review-answer{ background:var(--soft); border-radius:14px; padding:10px 14px; font-size:17px; margin-bottom:10px; }
+  .review-answer b{ color:var(--hour); }
+  .review-diff{ background:#fff0f0; border-radius:14px; padding:10px 14px; font-size:14px; color:#6b6f99; text-align:left; margin-bottom:8px; }
+  .review-diff b{ color:var(--bad); }
+  .review-swap{ background:#fff8e6; border-radius:14px; padding:10px 14px; font-size:14px; color:#8a6d1b; margin-bottom:8px; }
+  .review-done{ width:100%; box-shadow:0 6px 0 rgba(0,0,0,.16); }
+  .attempt.no{ cursor:pointer; }
+  .attempt.no:active{ transform:scale(.99); }
+  .attempt .review-hint{ display:none; }
+  /* confetti */
+  .confetti{position:absolute; top:-10px; width:10px; height:14px; opacity:.9; z-index:20; will-change:transform;}
+  /* ---------- history ---------- */
+  .history{ margin-top:18px; border-top:2px dashed #e6e8f5; padding-top:14px; }
+  .history-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .history-head h3{ margin:0; font-size:17px; color:var(--hour); }
+  .clear-hist{ border:none; background:var(--soft); color:var(--bad); font-weight:bold; font-size:12px;
+    padding:6px 12px; border-radius:999px; cursor:pointer; font-family:inherit; }
+  .clear-hist:active{ transform:scale(.94); }
+  .stat-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(86px,1fr)); gap:8px; margin-bottom:12px; }
+  .stat-card{ background:var(--soft); border-radius:14px; padding:8px 6px; text-align:center; }
+  .stat-card b{ display:block; font-size:20px; color:var(--ink); }
+  .stat-card span{ font-size:10px; color:#8a8fb5; font-weight:bold; text-transform:uppercase; letter-spacing:.3px; }
+  .attempts{ max-height:230px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:4px; }
+  .attempts::-webkit-scrollbar{ width:7px; }
+  .attempts::-webkit-scrollbar-thumb{ background:#d7dbf2; border-radius:999px; }
+  .attempt{ display:grid; grid-template-columns:30px 1fr 1fr 64px 30px; align-items:center; gap:6px;
+    background:#fafbff; border-radius:12px; padding:8px 10px; font-size:14px; }
+  .attempt.ok{ border-left:5px solid var(--good); }
+  .attempt.no{ border-left:5px solid var(--bad); }
+  .attempt .idx{ color:#b9bce0; font-weight:bold; font-size:12px; }
+  .attempt .shown{ font-weight:bold; color:var(--ink); }
+  .attempt .gave{ color:#6b6f99; }
+  .attempt .gave.wrong{ color:var(--bad); text-decoration:line-through; }
+  .attempt .secs{ text-align:right; font-weight:bold; font-size:13px; }
+  .attempt .secs.fast{ color:var(--good); }
+  .attempt .mark{ text-align:center; font-size:16px; }
+  .attempt .lvtag{ font-size:9px; color:#aeb2d6; font-weight:bold; }
+  .hist-empty{ text-align:center; color:#b9bce0; font-weight:bold; font-size:14px; padding:16px 0; }
+  /* ---------- mobile ---------- */
+  @media (max-width:560px){
+    body{ padding:8px; align-items:flex-start; }
+    .app{ border-radius:22px; padding:14px 13px 18px; }
+    .topbar{ flex-wrap:wrap; gap:6px; }
+    .level-chip{ font-size:14px; padding:5px 12px; }
+    .stat-mini{ gap:6px; }
+    .pill{ min-width:52px; padding:5px 8px; font-size:12px; }
+    .reset-btn{ width:36px; height:36px; font-size:18px; }
+    .clock{ width:min(300px,76vw); height:min(300px,76vw); }
+    .labels-row{ gap:30vw; }
+    .timebox{ width:24vw; max-width:96px; height:64px; font-size:36px; }
+    .colon{ font-size:36px; }
+    .keypad{ gap:8px; }
+    .key{ height:52px; font-size:24px; }
+    .key.del,.key.check{ font-size:18px; }
+    .feedback{ padding:18px; }
+    .fb-emoji{ font-size:64px; }
+    .fb-title{ font-size:28px; }
+    .fb-words{ font-size:22px; padding:7px 14px; }
+    .fb-sub{ font-size:17px; }
+    .overlay h1{ font-size:32px; }
+    .overlay p{ font-size:16px; }
+    .big-btn{ padding:14px 30px; font-size:22px; }
+    .win-stats{ gap:8px; }
+    .win-stat{ padding:8px 12px; }
+    .win-stat b{ font-size:22px; }
+    .stat-cards{ grid-template-columns:repeat(4,1fr); gap:6px; }
+    .stat-card{ padding:7px 3px; }
+    .stat-card b{ font-size:16px; }
+    .stat-card span{ font-size:8px; }
+    .attempts{ max-height:200px; }
+    .attempt{ grid-template-columns:24px 1fr auto 46px 22px; gap:5px; padding:7px 8px; font-size:12px; }
+    .attempt .lvtag{ display:none; }
+    .attempt .secs{ font-size:12px; }
+  }
+  @media (max-width:360px){
+    .timebox{ width:26vw; height:58px; font-size:30px; }
+    .key{ height:48px; font-size:22px; }
+    .attempt .gave{ font-size:11px; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- START SCREEN -->
+  <div class="overlay" id="startScreen">
+    <div style="font-size:80px">🕐</div>
+    <h1>Clock Hero</h1>
+    <p>Look at the clock.<br/>Type the time. Be quick!<br/>Become a Time Master! 🏆</p>
+    <input class="name-input" id="nameInput" type="text" maxlength="14" placeholder="Type your name 😊" autocomplete="off" />
+    <button class="big-btn" id="startBtn">▶ Start</button>
+    <p style="font-size:13px;opacity:.85">Goal: answer any time in under 2 seconds 🚀</p>
+  </div>
+
+  <!-- WIN SCREEN -->
+  <div class="overlay hidden" id="winScreen">
+    <div style="font-size:90px">🏆</div>
+    <h1 id="winTitle">TIME MASTER!</h1>
+    <p id="winMsg">You can tell ANY time<br/>super fast! Amazing! 🌟</p>
+    <div class="win-stats">
+      <div class="win-stat"><b id="winAcc">–</b><span>accuracy</span></div>
+      <div class="win-stat"><b id="winSpeed">–</b><span>avg speed</span></div>
+      <div class="win-stat"><b id="winTotal">–</b><span>questions</span></div>
+    </div>
+    <button class="big-btn" id="playAgainBtn">↺ Play again</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game">
+    <div class="topbar">
+      <div>
+        <div class="level-chip">⭐ Level <span id="levelNum">1</span></div>
+        <div class="level-name" id="levelName">O'clock</div>
+      </div>
+      <div class="stat-mini">
+        <div class="pill"><small>ACCURACY</small><span id="accStat">100%</span></div>
+        <div class="pill"><small>SPEED</small><span id="spdStat">–</span></div>
+        <button class="reset-btn" id="resetBtn" title="Start over">↺</button>
+      </div>
+    </div>
+
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+
+    <div class="game-grid">
+      <div class="col-clock">
+        <div class="streak-flames" id="streakFlames"></div>
+        <div class="clock-stage">
+          <svg class="clock" id="clock" viewBox="0 0 200 200"></svg>
+        </div>
+      </div>
+
+      <div class="col-input">
+        <div class="labels-row">
+          <div class="box-label">HOUR</div>
+          <div class="box-label">MINUTES</div>
+        </div>
+        <div class="answer-row">
+          <div class="timebox active" id="boxH" data-box="h"><span class="ph">--</span></div>
+          <div class="colon">:</div>
+          <div class="timebox" id="boxM" data-box="m"><span class="ph">--</span></div>
+        </div>
+
+        <div class="keypad" id="keypad">
+          <button class="key" data-d="1">1</button>
+          <button class="key" data-d="2">2</button>
+          <button class="key" data-d="3">3</button>
+          <button class="key" data-d="4">4</button>
+          <button class="key" data-d="5">5</button>
+          <button class="key" data-d="6">6</button>
+          <button class="key" data-d="7">7</button>
+          <button class="key" data-d="8">8</button>
+          <button class="key" data-d="9">9</button>
+          <button class="key del" id="delKey">⌫</button>
+          <button class="key" data-d="0">0</button>
+          <button class="key check" id="checkKey" disabled>✓ Go</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- history + statistics -->
+    <div class="history">
+      <div class="history-head">
+        <h3>📋 My Attempts</h3>
+        <button class="clear-hist" id="clearHistBtn">Clear</button>
+      </div>
+      <div class="stat-cards" id="statCards"></div>
+      <div class="attempts" id="attempts"></div>
+    </div>
+
+    <!-- per-question feedback -->
+    <div class="feedback" id="feedback">
+      <div class="fb-emoji" id="fbEmoji">🎉</div>
+      <div class="fb-title" id="fbTitle">Yes!</div>
+      <div class="fb-words" id="fbWords">three o'clock</div>
+      <div class="fb-sub" id="fbSub"></div>
+      <div class="fb-actions hidden" id="fbActions">
+        <button class="fb-btn show" id="showMeBtn">👀 Show me</button>
+        <button class="fb-btn next" id="nextBtn">Next ▶</button>
+      </div>
+    </div>
+
+    <!-- review / explanation overlay -->
+    <div class="review hidden" id="reviewScreen">
+      <div class="review-card">
+        <h2>👀 Let's read the clock!</h2>
+        <svg class="review-clock" id="reviewClock" viewBox="0 0 200 200"></svg>
+        <div class="review-legend">
+          <span><i class="dot hour"></i> short hand = hour</span>
+          <span><i class="dot minute"></i> long hand = minutes</span>
+        </div>
+        <ol class="review-steps" id="reviewSteps"></ol>
+        <div class="review-answer">
+          The clock shows <b id="reviewTime">3:30</b> = <b id="reviewWords">half past three</b>
+        </div>
+        <div id="reviewExtra"></div>
+        <button class="big-btn review-done" id="reviewDoneBtn">Got it! 👍</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- level config ----------
+  // each level defines the set of minute values that can appear
+  const LEVELS = [
+    { name:"O'clock",        minutes:[0] },
+    { name:"Half past",      minutes:[0,30] },
+    { name:"Quarters",       minutes:[0,15,30,45] },
+    { name:"Five minutes",   minutes:[0,5,10,15,20,25,30,35,40,45,50,55] },
+    { name:"Any time!",      minutes:rangeMinutes() }
+  ];
+  function rangeMinutes(){ const a=[]; for(let i=0;i<60;i++)a.push(i); return a; }
+
+  // advance within a level after this many correct-ish answers
+  const ADVANCE_AFTER = 6;
+  // mastery: rolling window measured at top level
+  const WINDOW = 12;          // last N answers considered for mastery
+  const TARGET_ACC = 0.95;    // 95% accuracy
+  const TARGET_TIME = 2.0;    // 2 seconds average
+  const FAST_MS = 2000;       // "fast" threshold for praise
+
+  // ---------- state ----------
+  let level = 0;
+  let answerH = "", answerM = "";
+  let activeBox = "h";
+  let current = { h:0, m:0 };
+  let qStartTime = 0;
+  let correctInLevel = 0;
+  let streak = 0;
+  let totalQ = 0, totalCorrect = 0;
+  const window12 = []; // {correct:bool, ms:number}
+  let locked = false;  // during feedback
+  let playerName = "";
+  let history = [];    // {n,h,m,gh,gm,correct,ms,level} newest-first
+
+  // ---------- elements ----------
+  const $ = id => document.getElementById(id);
+  const clock = $("clock");
+  const boxH = $("boxH"), boxM = $("boxM");
+  const checkKey = $("checkKey");
+
+  // ---------- audio (simple WebAudio chimes) ----------
+  let actx = null;
+  function tone(freq, dur, type, when, gain){
+    if(!actx) return;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type||"sine"; o.frequency.value = freq;
+    o.connect(g); g.connect(actx.destination);
+    const t = actx.currentTime + (when||0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain||0.25, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  function soundGood(){ tone(660,0.12,"triangle",0); tone(880,0.16,"triangle",0.1); tone(1320,0.2,"triangle",0.2); }
+  function soundWin(){ [523,659,784,1047].forEach((f,i)=>tone(f,0.25,"triangle",i*0.13,0.3)); }
+  function soundBad(){ tone(300,0.18,"sine",0,0.18); tone(200,0.22,"sine",0.12,0.18); }
+  function soundTick(){ tone(900,0.04,"square",0,0.06); }
+
+  // ---------- clock drawing ----------
+  function buildClockFace(){
+    const cx=100, cy=100, r=92;
+    let svg = "";
+    // face
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fffdf6" stroke="#5b4bff" stroke-width="5"/>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r-6}" fill="none" stroke="#e9e6ff" stroke-width="2"/>`;
+    // minute ticks
+    for(let i=0;i<60;i++){
+      const ang = (i*6-90)*Math.PI/180;
+      const big = i%5===0;
+      const r1 = r-4, r2 = big? r-12 : r-8;
+      const x1=cx+r1*Math.cos(ang), y1=cy+r1*Math.sin(ang);
+      const x2=cx+r2*Math.cos(ang), y2=cy+r2*Math.sin(ang);
+      svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${big?'#5b4bff':'#c9c4ff'}" stroke-width="${big?2.5:1.2}" stroke-linecap="round"/>`;
+    }
+    // hour numbers
+    for(let n=1;n<=12;n++){
+      const ang=(n*30-90)*Math.PI/180;
+      const rr=r-26;
+      const x=cx+rr*Math.cos(ang), y=cy+rr*Math.sin(ang);
+      svg += `<text x="${x}" y="${y+7}" text-anchor="middle" font-size="20" font-weight="bold" fill="#2b2d42" font-family="Comic Sans MS, sans-serif">${n}</text>`;
+    }
+    return svg;
+  }
+
+  function buildClockSVG(h, m, annotate){
+    const cx=100, cy=100;
+    let svg = buildClockFace();
+    const ha = ((h%12)*30 + m*0.5 - 90)*Math.PI/180;
+    const hr = 50;
+    const hx=cx+hr*Math.cos(ha), hy=cy+hr*Math.sin(ha);
+    const ma = (m*6 - 90)*Math.PI/180;
+    const mr = 74;
+    const mx=cx+mr*Math.cos(ma), my=cy+mr*Math.sin(ma);
+
+    if(annotate){
+      // highlight the hour number the short hand points to
+      const hourN = ((h+11)%12)+1; // 1..12
+      const hAng=(hourN*30-90)*Math.PI/180, rr=66;
+      const hnx=cx+rr*Math.cos(hAng), hny=cy+rr*Math.sin(hAng);
+      svg += `<circle cx="${hnx}" cy="${hny}" r="15" fill="none" stroke="#5b4bff" stroke-width="2.5" stroke-dasharray="4 3"/>`;
+      // highlight the minute tick the long hand points to
+      const mtAng=(m*6-90)*Math.PI/180, mtr=88;
+      const mtx=cx+mtr*Math.cos(mtAng), mty=cy+mtr*Math.sin(mtAng);
+      svg += `<circle cx="${mtx}" cy="${mty}" r="6.5" fill="#ff6f91" opacity="0.85"/>`;
+    }
+    svg += `<line x1="${cx}" y1="${cy}" x2="${hx}" y2="${hy}" stroke="#5b4bff" stroke-width="7" stroke-linecap="round"/>`;
+    svg += `<line x1="${cx}" y1="${cy}" x2="${mx}" y2="${my}" stroke="#ff6f91" stroke-width="5" stroke-linecap="round"/>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="6" fill="#2b2d42"/>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#fff"/>`;
+    return svg;
+  }
+  function renderClock(h, m){ clock.innerHTML = buildClockSVG(h, m, false); }
+
+  // ---------- words ----------
+  const NUM_WORDS = ["twelve","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve"];
+  function timeInWords(h, m){
+    const hw = NUM_WORDS[h];
+    const nextH = NUM_WORDS[(h%12)+1];
+    if(m===0) return hw+" o'clock";
+    if(m===15) return "quarter past "+hw;
+    if(m===30) return "half past "+hw;
+    if(m===45) return "quarter to "+nextH;
+    if(m<30){
+      return minWord(m)+" past "+hw;
+    } else {
+      return minWord(60-m)+" to "+nextH;
+    }
+  }
+  function minWord(m){
+    const small=["zero","one","two","three","four","five","six","seven","eight","nine","ten",
+      "eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty",
+      "twenty-one","twenty-two","twenty-three","twenty-four","twenty-five","twenty-six","twenty-seven","twenty-eight","twenty-nine"];
+    if(m<=29) return small[m] + (m===1?" minute":" minutes");
+    return m+" minutes";
+  }
+
+  // ---------- explanation / review ----------
+  function clockMark(m){ // which clock number the long hand points to
+    if(m%5!==0) return null;
+    const n=m/5; return n===0?12:n;
+  }
+  function explainTime(h, m, gh, gm){
+    const steps=[], diffs=[];
+    // hour step
+    steps.push(`👉 The <b style="color:var(--hour)">short hand</b> points near the <b>${h}</b> — so the hour is <b>${h}</b>.`);
+    // minute step
+    if(m===0){
+      steps.push(`👉 The <b style="color:var(--minute)">long hand</b> points straight up to <b>12</b> — that means <b>0 minutes</b> (o'clock).`);
+    } else {
+      const mk=clockMark(m);
+      if(mk) steps.push(`👉 The <b style="color:var(--minute)">long hand</b> points to the <b>${mk}</b>. Count by 5s: ${mk}×5 = <b>${m} minutes</b>.`);
+      else steps.push(`👉 The <b style="color:var(--minute)">long hand</b> is <b>${m} minutes</b> around the clock (between the marks).`);
+    }
+    // swapped-hands detection
+    const mk=clockMark(m), hMarkMin=(h%12)*5;
+    const swap = (mk!=null) && Number.isFinite(gh) && Number.isFinite(gm) &&
+                 (gh===mk) && (gm===hMarkMin);
+    // differences from what the kid typed
+    if(Number.isFinite(gh) && gh!==h) diffs.push(`You wrote hour <b>${gh}</b>, but the short hand was at <b>${h}</b>.`);
+    if(Number.isFinite(gm) && gm!==m) diffs.push(`You wrote <b>${gm}</b> minutes, but the long hand was at <b>${m}</b>.`);
+    return { steps, diffs, swap, words:timeInWords(h,m) };
+  }
+  let reviewReturnsToFeedback=false;
+  function openReview(h, m, gh, gm){
+    const ex=explainTime(h,m,gh,gm);
+    $("reviewClock").innerHTML = buildClockSVG(h, m, true);
+    $("reviewTime").textContent = fmtTime(h,m);
+    $("reviewWords").textContent = ex.words;
+    let html = ex.steps.map(s=>`<li>${s}</li>`).join("");
+    $("reviewSteps").innerHTML = html;
+    let extra="";
+    if(ex.swap) extra += `<div class="review-swap">🔄 Oops! Looks like the two hands got swapped. The <b style="color:var(--hour)">short hand</b> tells the <b>hour</b>, the <b style="color:var(--minute)">long hand</b> tells the <b>minutes</b>.</div>`;
+    if(ex.diffs.length) extra += `<div class="review-diff">${ex.diffs.map(d=>`<div>• ${d}</div>`).join("")}</div>`;
+    $("reviewExtra").innerHTML = extra;
+    $("reviewScreen").classList.remove("hidden");
+  }
+  function closeReview(){
+    $("reviewScreen").classList.add("hidden");
+    if(reviewReturnsToFeedback){ reviewReturnsToFeedback=false; /* stay on feedback */ }
+  }
+
+  // ---------- question flow ----------
+  function pickQuestion(){
+    const cfg = LEVELS[level];
+    const h = 1 + Math.floor(Math.random()*12);
+    const m = cfg.minutes[Math.floor(Math.random()*cfg.minutes.length)];
+    current = { h, m };
+    renderClock(h, m);
+    answerH=""; answerM=""; activeBox="h";
+    updateBoxes();
+    locked=false;
+    qStartTime = performance.now();
+  }
+
+  function updateBoxes(){
+    boxH.classList.toggle("active", activeBox==="h");
+    boxM.classList.toggle("active", activeBox==="m");
+    boxH.innerHTML = answerH==="" ? '<span class="ph">--</span>' : answerH;
+    boxM.innerHTML = answerM==="" ? '<span class="ph">--</span>' : (answerM.length===1? answerM : answerM);
+    // enable Go when hour has 1-2 digits and minute has 1-2 digits
+    const ready = answerH.length>=1 && answerM.length>=1;
+    checkKey.disabled = !ready;
+  }
+
+  function pressDigit(d){
+    if(locked) return;
+    soundTick();
+    if(activeBox==="h"){
+      if(answerH.length>=2) answerH=""; // restart hour if already full
+      answerH += d;
+      // auto-jump: if hour can't take a 2nd digit meaningfully, move on
+      const hv = parseInt(answerH,10);
+      if(answerH.length===2 || hv>1){ // 2,3,...9 -> can't be start of 2-digit valid hour(<=12) except 1
+        if(!(answerH==="1")) activeBox="m";
+      }
+      if(answerH.length===2) activeBox="m";
+    } else {
+      if(answerM.length>=2) answerM="";
+      answerM += d;
+      if(answerM.length===2){ /* full */ }
+    }
+    updateBoxes();
+  }
+
+  function backspace(){
+    if(locked) return;
+    soundTick();
+    if(activeBox==="m" && answerM.length>0){ answerM=answerM.slice(0,-1); }
+    else if(activeBox==="m" && answerM.length===0){ activeBox="h"; }
+    else if(activeBox==="h" && answerH.length>0){ answerH=answerH.slice(0,-1); }
+    updateBoxes();
+  }
+
+  function checkAnswer(){
+    if(locked) return;
+    const h = parseInt(answerH,10);
+    const m = parseInt(answerM,10);
+    const ms = performance.now() - qStartTime;
+    const correct = (h===current.h) && (m===current.m);
+
+    locked = true;
+    totalQ++;
+    if(correct) totalCorrect++;
+    streak = correct ? streak+1 : 0;
+
+    // window for mastery only counts top-level answers
+    if(level === LEVELS.length-1){
+      window12.push({ correct, ms });
+      if(window12.length>WINDOW) window12.shift();
+    }
+    if(correct) correctInLevel++;
+
+    const attemptNo = (history.length? history[0].n : 0) + 1;
+    history.unshift({ n:attemptNo, h:current.h, m:current.m, gh:h, gm:m, correct, ms, level });
+    if(history.length>200) history.pop();
+    saveHistory();
+    renderHistory();
+
+    updateStats();
+    showFeedback(correct, ms);
+  }
+
+  let lastWrong = null; // {h,m,gh,gm} for the Show-me button
+  function showFeedback(correct, ms){
+    const fb=$("feedback");
+    const words = timeInWords(current.h, current.m);
+    const fast = ms <= FAST_MS;
+    $("fbWords").textContent = words;
+    if(correct){
+      (actx) && soundGood();
+      $("fbEmoji").textContent = fast ? "🚀" : "🎉";
+      const nm = playerName ? ", "+playerName : "";
+      $("fbTitle").textContent = fast ? ("Super fast"+nm+"!") : ("Correct"+nm+"!");
+      $("fbTitle").style.color = "var(--good)";
+      const secs=(ms/1000).toFixed(1);
+      $("fbSub").innerHTML = `<span class="${fast?'fb-time-fast':''}">${secs}s</span>` + (streak>=3?`  •  🔥 ${streak} in a row!`:"");
+      $("fbActions").classList.add("hidden");
+      fb.classList.add("show");
+      setTimeout(()=>{ fb.classList.remove("show"); afterFeedback(); }, fast?900:1200);
+    } else {
+      (actx) && soundBad();
+      $("fbEmoji").textContent = "🤔";
+      $("fbTitle").textContent = "Almost!";
+      $("fbTitle").style.color = "var(--bad)";
+      const a=parseInt(answerH,10), b=parseInt(answerM,10);
+      $("fbSub").innerHTML = `You wrote <b>${fmtTime(a,b)}</b> &nbsp;·&nbsp; it was <b>${fmtTime(current.h,current.m)}</b>`;
+      lastWrong = { h:current.h, m:current.m, gh:a, gm:b };
+      $("fbActions").classList.remove("hidden");  // wrong: wait for kid to tap
+      fb.classList.add("show");
+    }
+  }
+  function dismissFeedbackAndContinue(){
+    $("feedback").classList.remove("show");
+    $("fbActions").classList.add("hidden");
+    afterFeedback();
+  }
+
+  function afterFeedback(){
+    // level progression
+    maybeAdvanceLevel();
+    if(checkMastery()){ winGame(); return; }
+    pickQuestion();
+  }
+
+  function maybeAdvanceLevel(){
+    if(level < LEVELS.length-1 && correctInLevel >= ADVANCE_AFTER){
+      level++;
+      correctInLevel = 0;
+      flashLevelUp();
+      updateLevelUI();
+    }
+  }
+
+  function checkMastery(){
+    if(level !== LEVELS.length-1) return false;
+    if(window12.length < WINDOW) return false;
+    const acc = window12.filter(w=>w.correct).length / window12.length;
+    const avgMs = window12.reduce((s,w)=>s+w.ms,0)/window12.length;
+    return acc >= TARGET_ACC && (avgMs/1000) <= TARGET_TIME;
+  }
+
+  // ---------- history + statistics ----------
+  function fmtTime(h,m){ return h+":"+String(m).padStart(2,"0"); }
+  function histKey(){ return "clockHeroHist:"+(playerName||"_guest"); }
+  function saveHistory(){ try{ localStorage.setItem(histKey(), JSON.stringify(history.slice(0,200))); }catch(e){} }
+  function loadHistory(){
+    history=[];
+    try{ const raw=localStorage.getItem(histKey()); if(raw) history=JSON.parse(raw)||[]; }catch(e){ history=[]; }
+  }
+  function renderHistory(){
+    // stats cards
+    const total=history.length;
+    const correct=history.filter(a=>a.correct).length;
+    const acc=total?Math.round(correct/total*100):0;
+    const times=history.filter(a=>a.correct).map(a=>a.ms);
+    const avg=times.length?(times.reduce((s,t)=>s+t,0)/times.length/1000):0;
+    const best=times.length?(Math.min(...times)/1000):0;
+    const cards=[
+      {b:total, s:"attempts"},
+      {b:acc+"%", s:"accuracy"},
+      {b:avg?avg.toFixed(1)+"s":"–", s:"avg speed"},
+      {b:best?best.toFixed(1)+"s":"–", s:"best speed"},
+    ];
+    $("statCards").innerHTML = cards.map(c=>`<div class="stat-card"><b>${c.b}</b><span>${c.s}</span></div>`).join("");
+    // attempt rows
+    const att=$("attempts");
+    if(!total){ att.innerHTML='<div class="hist-empty">No attempts yet — start playing! 🕐</div>'; return; }
+    att.innerHTML = history.map(a=>{
+      const secs=(a.ms/1000).toFixed(1);
+      const fast=a.ms<=FAST_MS && a.correct;
+      const gaveCls = a.correct?"gave":"gave wrong";
+      const lvl = (a.level!=null)? `<span class="lvtag">L${a.level+1}</span>`:"";
+      const dataAttr = a.correct ? "" : ` data-rev="${a.h},${a.m},${a.gh},${a.gm}" title="Tap to see why"`;
+      const mark = a.correct ? "✅" : "👀";
+      return `<div class="attempt ${a.correct?'ok':'no'}"${dataAttr}>
+        <span class="idx">#${a.n}</span>
+        <span class="shown">🕐 ${fmtTime(a.h,a.m)} ${lvl}</span>
+        <span class="${gaveCls}">typed ${fmtTime(a.gh,a.gm)}</span>
+        <span class="secs ${fast?'fast':''}">${secs}s</span>
+        <span class="mark">${mark}</span>
+      </div>`;
+    }).join("");
+  }
+
+  // ---------- UI updates ----------
+  function updateLevelUI(){
+    $("levelNum").textContent = level+1;
+    $("levelName").textContent = LEVELS[level].name;
+  }
+  function updateStats(){
+    const acc = totalQ? Math.round(totalCorrect/totalQ*100) : 100;
+    $("accStat").textContent = acc+"%";
+    // speed = avg of window if at top level, else avg of recent correct
+    let spd = "–";
+    if(window12.length){
+      const avg = window12.reduce((s,w)=>s+w.ms,0)/window12.length/1000;
+      spd = avg.toFixed(1)+"s";
+    }
+    $("spdStat").textContent = spd;
+    // progress: blend of level progress + mastery window
+    let pct;
+    if(level < LEVELS.length-1){
+      pct = ((level + correctInLevel/ADVANCE_AFTER) / LEVELS.length) * 100;
+    } else {
+      const acc2 = window12.length? window12.filter(w=>w.correct).length/window12.length : 0;
+      const fill = window12.length/WINDOW;
+      pct = ((LEVELS.length-1)/LEVELS.length)*100 + (fill*acc2)*(100/LEVELS.length);
+    }
+    $("progressBar").style.width = Math.min(100,pct)+"%";
+    // streak flames
+    $("streakFlames").textContent = streak>=3 ? "🔥".repeat(Math.min(streak,8))+" "+streak+" streak!" : "";
+  }
+
+  function flashLevelUp(){
+    const fb=$("feedback");
+    $("fbEmoji").textContent="⬆️";
+    $("fbTitle").textContent="Level Up!";
+    $("fbTitle").style.color="var(--warn)";
+    $("fbWords").textContent="Level "+(level+1)+": "+LEVELS[level].name;
+    $("fbSub").textContent="Getting trickier! 💪";
+    (actx)&&soundWin();
+    confettiBurst(18);
+    fb.classList.add("show");
+    setTimeout(()=>fb.classList.remove("show"),1400);
+  }
+
+  // ---------- confetti ----------
+  function confettiBurst(n){
+    const colors=["#ff6f91","#ffd166","#06d6a0","#5b4bff","#18b6e8"];
+    const app=$("app");
+    for(let i=0;i<n;i++){
+      const c=document.createElement("div");
+      c.className="confetti";
+      c.style.background=colors[i%colors.length];
+      c.style.left=(10+Math.random()*80)+"%";
+      c.style.borderRadius=Math.random()<.5?"2px":"50%";
+      app.appendChild(c);
+      const dx=(Math.random()*2-1)*120;
+      const dur=900+Math.random()*700;
+      const rot=Math.random()*720;
+      c.animate([
+        {transform:`translate(0,0) rotate(0deg)`,opacity:1},
+        {transform:`translate(${dx}px,${300+Math.random()*120}px) rotate(${rot}deg)`,opacity:0}
+      ],{duration:dur,easing:"cubic-bezier(.3,.7,.4,1)"}).onfinish=()=>c.remove();
+    }
+  }
+
+  // ---------- win ----------
+  function winGame(){
+    const acc = Math.round(totalCorrect/totalQ*100);
+    const avg = window12.reduce((s,w)=>s+w.ms,0)/window12.length/1000;
+    if(playerName){
+      $("winTitle").textContent = playerName.toUpperCase()+" THE TIME MASTER!";
+      $("winMsg").innerHTML = "You can tell ANY time<br/>super fast, "+playerName+"! 🌟";
+    }
+    $("winAcc").textContent = acc+"%";
+    $("winSpeed").textContent = avg.toFixed(1)+"s";
+    $("winTotal").textContent = totalQ;
+    $("winScreen").classList.remove("hidden");
+    (actx)&&soundWin();
+    let bursts=0;
+    const iv=setInterval(()=>{ confettiBurst(24); if(++bursts>=5) clearInterval(iv); },350);
+  }
+
+  // ---------- reset ----------
+  function resetGame(){
+    level=0; answerH=""; answerM=""; activeBox="h";
+    correctInLevel=0; streak=0; totalQ=0; totalCorrect=0;
+    window12.length=0; locked=false;
+    updateLevelUI(); updateStats();
+    pickQuestion();
+  }
+
+  // ---------- events ----------
+  document.querySelectorAll(".key[data-d]").forEach(k=>{
+    k.addEventListener("click",()=>pressDigit(k.dataset.d));
+  });
+  $("delKey").addEventListener("click",backspace);
+  checkKey.addEventListener("click",checkAnswer);
+  $("resetBtn").addEventListener("click",()=>{
+    if(totalQ>0 && !confirm("Start over from Level 1?")) return;
+    resetGame();
+  });
+  $("clearHistBtn").addEventListener("click",()=>{
+    if(history.length && !confirm("Clear all attempt history?")) return;
+    history=[]; saveHistory(); renderHistory();
+  });
+  // wrong-answer feedback buttons
+  $("showMeBtn").addEventListener("click",()=>{ if(lastWrong){ reviewReturnsToFeedback=true; openReview(lastWrong.h,lastWrong.m,lastWrong.gh,lastWrong.gm); } });
+  $("nextBtn").addEventListener("click",dismissFeedbackAndContinue);
+  $("reviewDoneBtn").addEventListener("click",closeReview);
+  // tap a wrong row in history to review it
+  $("attempts").addEventListener("click",(e)=>{
+    const row=e.target.closest(".attempt[data-rev]");
+    if(!row) return;
+    const [h,m,gh,gm]=row.getAttribute("data-rev").split(",").map(Number);
+    reviewReturnsToFeedback=false;
+    openReview(h,m,gh,gm);
+  });
+  boxH.addEventListener("click",()=>{ if(!locked){activeBox="h"; updateBoxes();} });
+  boxM.addEventListener("click",()=>{ if(!locked){activeBox="m"; updateBoxes();} });
+
+  // physical keyboard support (for parents/older kids)
+  document.addEventListener("keydown",(e)=>{
+    if($("startScreen").classList.contains("hidden")===false) return;
+    if(!$("reviewScreen").classList.contains("hidden")){ if(e.key==="Enter"||e.key==="Escape") closeReview(); return; }
+    if(!$("fbActions").classList.contains("hidden")){ if(e.key==="Enter") dismissFeedbackAndContinue(); return; }
+    if(e.key>="0"&&e.key<="9") pressDigit(e.key);
+    else if(e.key==="Backspace") backspace();
+    else if(e.key==="Enter"){ if(!checkKey.disabled) checkAnswer(); }
+    else if(e.key===":"||e.key==="ArrowRight"){ activeBox="m"; updateBoxes(); }
+    else if(e.key==="ArrowLeft"){ activeBox="h"; updateBoxes(); }
+  });
+
+  function start(){
+    playerName = ($("nameInput").value||"").trim().slice(0,14);
+    try{ localStorage.setItem("clockHeroName", playerName); }catch(e){}
+    loadHistory(); renderHistory();
+    try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; }
+    if(actx && actx.state==="suspended") actx.resume();
+    $("startScreen").classList.add("hidden");
+    $("winScreen").classList.add("hidden");
+    resetGame();
+  }
+  $("startBtn").addEventListener("click",start);
+  $("playAgainBtn").addEventListener("click",start);
+
+  // prefill saved name
+  try{ const saved=localStorage.getItem("clockHeroName"); if(saved) $("nameInput").value=saved; }catch(e){}
+  $("nameInput").addEventListener("keydown",(e)=>{ if(e.key==="Enter") start(); });
+
+  // draw an idle clock behind start screen
+  renderClock(10,10);
+  updateLevelUI();
+})();
+</script>
+</body>
+</html>
